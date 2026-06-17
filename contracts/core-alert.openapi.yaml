@@ -1,0 +1,382 @@
+openapi: 3.1.0
+info:
+  title: Campus Alert Management API
+  version: 1.0.0
+  description: API for managing alerts in the Smart Campus system. Lab 02 contract implemented in Lab 03 with comprehensive test coverage.
+
+servers:
+  - url: http://localhost:4010
+    description: Prism mock server
+  - url: http://localhost:8000
+    description: Local development server
+
+tags:
+  - name: health
+    description: Health and status checks
+  - name: alerts
+    description: Alert management operations
+
+security:
+  - BearerAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Check health status
+      operationId: checkHealth
+      description: Public health check endpoint for service readiness
+      tags: [health]
+      security: []
+      responses:
+        '200':
+          description: Server hoạt động bình thường
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+              examples:
+                ok:
+                  value:
+                    status: ok
+                    service: core-alert
+                    time: "2026-05-13T08:30:00+07:00"
+
+  /alerts/recent:
+    get:
+      summary: Lấy danh sách cảnh báo gần đây
+      operationId: getRecentAlerts
+      description: Retrieve a list of recent alerts with optional limit parameter
+      tags: [alerts]
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+          description: Số cảnh báo tối đa cần lấy
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AlertMessage'
+              examples:
+                success:
+                  value:
+                    items:
+                      - id: 550e8400-e29b-41d4-a716-446655440000
+                        sourceService: iot-ingestion
+                        alertType: TEMPERATURE_HIGH
+                        severity: HIGH
+                        message: Temperature exceeded 80°C
+                        status: OPEN
+                        createdAt: "2026-05-13T08:30:00+07:00"
+        '401':
+          description: Chưa xác thực
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '429':
+          description: Quá nhiều yêu cầu
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  /alerts/{id}:
+    get:
+      summary: Lấy chi tiết một cảnh báo
+      operationId: getAlertById
+      description: Retrieve details of a specific alert by its ID
+      tags: [alerts]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Alert ID
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertMessage'
+              examples:
+                success:
+                  value:
+                    id: 550e8400-e29b-41d4-a716-446655440000
+                    sourceService: iot-ingestion
+                    alertType: TEMPERATURE_HIGH
+                    severity: HIGH
+                    message: Temperature exceeded 80°C
+                    status: OPEN
+                    createdAt: "2026-05-13T08:30:00+07:00"
+        '404':
+          description: Không tìm thấy cảnh báo
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: Chưa xác thực
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  /alerts:
+    post:
+      summary: Đẩy một cảnh báo mới
+      operationId: createAlert
+      description: Create a new alert in the system
+      tags: [alerts]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertInput'
+            examples:
+              valid_high:
+                value:
+                  sourceService: iot-ingestion
+                  alertType: TEMPERATURE_HIGH
+                  severity: HIGH
+                  message: Temperature exceeded 80°C
+              boundary_critical:
+                value:
+                  sourceService: ai-vision
+                  alertType: INTRUSION_DETECTED
+                  severity: CRITICAL
+                  message: Unauthorized person detected
+      responses:
+        '200':
+          description: Tiếp nhận thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum: [OPEN, IN_PROGRESS, RESOLVED, CLOSED]
+                  createdAt:
+                    type: string
+                    format: date-time
+        '400':
+          description: Dữ liệu đầu vào không hợp lệ
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+              examples:
+                invalid_payload:
+                  value:
+                    type: https://smart-campus.local/problems/validation-error
+                    title: Validation Error
+                    status: 400
+                    detail: Invalid payload format
+                    instance: https://smart-campus.local/alerts
+        '422':
+          description: Sai nghiệp vụ hoặc thiếu trường dữ liệu
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+              examples:
+                missing_field:
+                  value:
+                    type: https://smart-campus.local/problems/business-error
+                    title: Business Error
+                    status: 422
+                    detail: sourceService is required
+                    instance: https://smart-campus.local/alerts
+                    errors:
+                      - field: sourceService
+                        code: REQUIRED
+                        message: This field is required
+        '401':
+          description: Chưa xác thực
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '429':
+          description: Quá nhiều yêu cầu
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: JWT Bearer token
+
+  schemas:
+    HealthStatus:
+      type: object
+      required:
+        - status
+        - service
+        - time
+      properties:
+        status:
+          type: string
+          enum: [ok, error]
+          description: Service health status
+        service:
+          type: string
+          description: Service identifier
+        time:
+          type: string
+          format: date-time
+          description: Current server time
+
+    AlertInput:
+      type: object
+      required:
+        - sourceService
+        - alertType
+        - severity
+        - message
+      properties:
+        sourceService:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Name of the service generating the alert
+        alertType:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Type of alert
+        severity:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+          description: Alert severity level
+        message:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          description: Alert message
+        relatedEventId:
+          type: string
+          format: uuid
+          description: Optional related event ID
+
+    AlertMessage:
+      type: object
+      required:
+        - id
+        - sourceService
+        - alertType
+        - severity
+        - message
+        - status
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique alert identifier
+        sourceService:
+          type: string
+          description: Service that generated this alert
+        alertType:
+          type: string
+          description: Type of alert
+        severity:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+          description: Alert severity
+        message:
+          type: string
+          description: Alert message
+        relatedEventId:
+          type:
+            - string
+            - "null"
+          format: uuid
+          description: Optional related event ID
+        status:
+          type: string
+          enum: [OPEN, IN_PROGRESS, RESOLVED, CLOSED]
+          description: Alert status
+        createdAt:
+          type: string
+          format: date-time
+          description: Alert creation timestamp
+        resolvedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+          description: Alert resolution timestamp if applicable
+
+    ProblemDetails:
+      type: object
+      required:
+        - type
+        - title
+        - status
+        - detail
+        - instance
+      properties:
+        type:
+          type: string
+          format: uri
+          description: Problem type URI
+        title:
+          type: string
+          description: Problem title
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+          description: HTTP status code
+        detail:
+          type: string
+          description: Detailed error message
+        instance:
+          type: string
+          format: uri
+          description: Request instance
+        errors:
+          type: array
+          items:
+            type: object
+            required:
+              - field
+              - code
+              - message
+            properties:
+              field:
+                type: string
+                description: Field name with error
+              code:
+                type: string
+                description: Error code
+              message:
+                type: string
+                description: Error message
+          description: Array of validation errors
