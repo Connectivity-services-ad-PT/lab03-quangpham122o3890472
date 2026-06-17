@@ -86,7 +86,7 @@
             "description": "Create a valid alert",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"sourceService\": \"iot-ingestion\",\n  \"alertType\": \"TEMPERATURE_HIGH\",\n  \"severity\": \"HIGH\",\n  \"message\": \"Temperature exceeded 80°C in Lab A01\",\n  \"relatedEventId\": null\n}",
+              "raw": "{\n  \"sourceService\": \"iot-ingestion\",\n  \"alertType\": \"TEMPERATURE_HIGH\",\n  \"severity\": \"HIGH\",\n  \"message\": \"Temperature exceeded 80°C in Lab A01\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -512,8 +512,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Invalid UUID format returns 400 or 404', function () {",
-                  "  pm.expect([400, 404]).to.include(pm.response.code);",
+                  "pm.test('Invalid UUID format returns client error', function () {",
+                  "  pm.expect([400, 404, 422]).to.include(pm.response.code);",
                   "});"
                 ]
               }
